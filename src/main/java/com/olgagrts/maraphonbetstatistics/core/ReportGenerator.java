@@ -19,7 +19,7 @@ import static java.lang.Thread.sleep;
 @Service
 public class ReportGenerator {
 
-    private static final String url = "https://www.marathonbet.by/su/betting/?cpcids=all&cppcids=all&interval=ALL_TIME";
+    private static final String MARATHON_BET_URL = "https://www.marathonbet.by/su/betting/?cpcids=all&cppcids=all&interval=ALL_TIME";
 
     Logger logger = LoggerFactory.getLogger(ReportGenerator.class);
 
@@ -28,7 +28,7 @@ public class ReportGenerator {
         List<Match> allMatches = new LinkedList<>();
 
         Document document = null;
-        document = Jsoup.connect(url).get();
+        document = Jsoup.connect(MARATHON_BET_URL).get();
         Element content = document.selectFirst("#events_content > div:nth-child(1) > div");
 
         Elements elements = content.getElementsByClass("sport-category-container");
@@ -40,11 +40,11 @@ public class ReportGenerator {
             for (Element tournamentContainer : tournaments) {
                 Elements tournament = tournamentContainer.getElementsByClass("category-container collapsed");
 
-                for (int i = 0; i < tournament.size(); i++) {
+                for (Element value : tournament) {
                     try {
-                        getMatchesForEachTournament(allMatches, sportCategoryName, tournament.get(i));
+                        extractMatchesForEachTournament(allMatches, sportCategoryName, value);
                     } catch (InterruptedException | IOException e) {
-                        i++;
+                        // go to next child url
                     }
                 }
             }
@@ -52,9 +52,10 @@ public class ReportGenerator {
         return allMatches;
     }
 
-    private void getMatchesForEachTournament(List<Match> allMatches, String sportCategoryName, Element game) throws InterruptedException, IOException {
+    private void extractMatchesForEachTournament(List<Match> allMatches, String sportCategoryName, Element game) throws InterruptedException, IOException {
         Element table = game.getElementsByClass("category-header").first();
         String tourniquetLink = table.getElementsByClass("show-category-events").first().getElementsByTag("a").attr("href");
+
         String fullTourniquetLinkUrl = "https://www.marathonbet.by" + tourniquetLink;
         sleep(1);
         Document tourniquetDocument = Jsoup.connect(fullTourniquetLinkUrl).get();
@@ -67,25 +68,29 @@ public class ReportGenerator {
 
         Elements pairGames = tourniquetDocument.getElementsByClass("bg coupon-row");
         for (Element pairGame : pairGames) {
-            getAllTournamentGames(allMatches, sportCategoryName, fullTourniquetLinkUrl, tournamentName, pairGame);
+            extractAllTournamentGames(allMatches, sportCategoryName, fullTourniquetLinkUrl, tournamentName, pairGame);
         }
     }
 
-    private void getAllTournamentGames(List<Match> allMatches, String sportCategoryName, String fullTourniquetLinkUrl, StringBuilder tournamentName, Element pairGame) {
+    private void extractAllTournamentGames(List<Match> allMatches, String sportCategoryName, String fullTourniquetLinkUrl, StringBuilder tournamentName, Element pairGame) {
         String pairGameName = pairGame.getElementsByClass("bg coupon-row").first().attr("data-event-name");
         logger.info("pairGames: " + pairGameName);
 
-        Match match = new Match();
-        match.setSport(sportCategoryName);
-        match.setUrlToEvent(fullTourniquetLinkUrl);
-        match.setTournament(String.valueOf(tournamentName));
-        match.setCommands(pairGameName);
 
-        getMatchDate(pairGame, match);
+        String url2 = pairGame.getElementsByClass("bg coupon-row").first().attr("data-event-path");
+
+        Match match = Match.builder()
+                .sport(sportCategoryName)
+                .urlToEvent("https://www.marathonbet.by/su/betting/" + url2)
+                .tournament(String.valueOf(tournamentName))
+                .commands(pairGameName)
+                .build();
+
+        parseMatchDate(pairGame, match);
         allMatches.add(match);
     }
 
-    private void getMatchDate(Element pairGame, Match match) {
+    private void parseMatchDate(Element pairGame, Match match) {
         if (pairGame.getElementsByClass("date date-short").first() != null) {
             String time = pairGame.getElementsByClass("date date-short").first().text();
             if (time.length() > 10) {

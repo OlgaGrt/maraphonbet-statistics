@@ -1,8 +1,7 @@
 package com.olgagrts.maraphonbetstatistics.core;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.Builder;
+import lombok.Data;
 
 /*
  (матч это когда есть 2 команды Team 1 vs Team 2), которые ожидаются.
@@ -12,10 +11,8 @@ import lombok.ToString;
  - вид спорта,
  - ссылка на событие
  */
-
-@ToString
-@Setter
-@Getter
+@Builder
+@Data
 public class Match {
     String sport;
     String urlToEvent;
